@@ -69,10 +69,12 @@ function Select-Provider([string]$Choice) {
     }
 }
 
-function Refresh-Path {
+function Update-SessionPath {
+    # Append, never replace: the installer runs via Invoke-Expression in this
+    # process and may have extended $env:Path in-session rather than in the registry.
     $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $user = [Environment]::GetEnvironmentVariable("Path", "User")
-    $env:Path = "$machine;$user;$HOME\.local\bin;$HOME\AppData\Local\codebuddy\bin"
+    $env:Path = "$env:Path;$machine;$user;$HOME\.local\bin;$HOME\AppData\Local\codebuddy\bin"
 }
 
 function Show-Handoff {
@@ -150,7 +152,11 @@ while ($true) {
         "INSTALL" {
             Banner; Write-Host (T "installing")
             try {
-                $installer = Invoke-RestMethod -Uri $InstallUrl -TimeoutSec 30
+                # Invoke-WebRequest keeps the script as raw text; Invoke-RestMethod
+                # would deserialize it if the server sent a JSON/XML content type.
+                $resp = Invoke-WebRequest -Uri $InstallUrl -UseBasicParsing -TimeoutSec 60
+                $installer = if ($resp.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }
+                if ([string]::IsNullOrWhiteSpace($installer)) { throw "Empty installer script from $InstallUrl" }
                 Invoke-Expression $installer
                 $State="VERIFY"
             } catch {
@@ -158,7 +164,7 @@ while ($true) {
             }
         }
         "VERIFY" {
-            Refresh-Path; Write-Host "`n$(T 'verifying')"
+            Update-SessionPath; Write-Host "`n$(T 'verifying')"
             try {
                 $cmd=Get-Command $CommandName -ErrorAction Stop
                 & $cmd.Source --version
@@ -172,7 +178,7 @@ while ($true) {
             Write-Host ""; Show-Handoff
             $c=Read-Host "`n$(T 'launch')"
             if ([string]::IsNullOrWhiteSpace($c) -or $c -match "^(y|yes|是)$") {
-                Refresh-Path
+                Update-SessionPath
                 try { & $CommandName } catch { Write-Host (T "not_found") }
             }
             $State="DONE"
