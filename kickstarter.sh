@@ -130,7 +130,7 @@ while true; do
   case "$STATE" in
     LANGUAGE)
       banner; echo "$(t choose_language)"; echo; echo "  [1] 中文"; echo "  [2] English"; echo
-      read -r -p "> " c
+      read -r -p "> " c || exit 1
       case "$c" in 1) LANGUAGE="zh"; STATE="PROBE";; 2) LANGUAGE="en"; STATE="PROBE";; *) sleep 1;; esac;;
     PROBE)
       banner; echo "$(t probing)"; probe_google; echo
@@ -140,7 +140,7 @@ while true; do
       echo "  [1] Qwen Code — $(t qwen)"; echo
       echo "  [2] Kimi Code — $(t kimi)"; echo
       echo "  [3] CodeBuddy CLI — $(t buddy)"; echo
-      read -r -p "$(t default) " c
+      read -r -p "$(t default) " c || exit 1
       case "${c:-1}" in 1|2|3) select_provider "${c:-1}"; STATE="PRECHECK";; *) sleep 1;; esac;;
     PRECHECK)
       banner; echo "$(t checking)"
@@ -149,7 +149,7 @@ while true; do
       STATE="CONFIRM";;
     CONFIRM)
       banner; echo "$(t ready): $PROVIDER_NAME"; echo "Google: $GOOGLE_STATUS"; echo "Source: $INSTALL_URL"; echo
-      read -r -p "$(t confirm) " c
+      read -r -p "$(t confirm) " c || exit 1
       case "${c:-Y}" in y|Y|yes|YES|是) STATE="INSTALL";; *) STATE="DONE";; esac;;
     INSTALL)
       banner; echo "$(t installing)"; echo
@@ -167,14 +167,14 @@ while true; do
       STATE="HANDOFF";;
     HANDOFF)
       echo; handoff; echo
-      read -r -p "$(t launch) " c
+      read -r -p "$(t launch) " c || exit 1
       if [[ "${c:-Y}" =~ ^([yY]|yes|YES|是)$ ]]; then
         refresh_path
         command -v "$COMMAND_NAME" >/dev/null 2>&1 && exec "$COMMAND_NAME"
       fi
       STATE="DONE";;
     ERROR)
-      echo; echo "$(t failed) $LAST_ERROR"; echo "$(t retry)"; read -r -p "> " c
+      echo; echo "$(t failed) $LAST_ERROR"; echo "$(t retry)"; read -r -p "> " c || exit 1
       case "$c" in 1) STATE="PRECHECK";; 2) STATE="SELECT";; 3) STATE="DONE";; esac;;
     DONE)
       read -r -p "$(t exit)" _; exit 0;;
