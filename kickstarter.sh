@@ -153,7 +153,14 @@ while true; do
       case "${c:-Y}" in y|Y|yes|YES|是) STATE="INSTALL";; *) STATE="DONE";; esac;;
     INSTALL)
       banner; echo "$(t installing)"; echo
-      if bash -c "$(curl -fsSL "$INSTALL_URL")"; then STATE="VERIFY"; else LAST_ERROR="$PROVIDER_NAME installer returned an error"; STATE="ERROR"; fi;;
+      installer="$(curl -fsSL --connect-timeout 10 --max-time 60 "$INSTALL_URL")" || installer=""
+      if [[ -z "$installer" ]]; then
+        LAST_ERROR="download failed: $INSTALL_URL"; STATE="ERROR"
+      elif bash -c "$installer"; then
+        STATE="VERIFY"
+      else
+        LAST_ERROR="$PROVIDER_NAME installer returned an error"; STATE="ERROR"
+      fi;;
     VERIFY)
       refresh_path; echo; echo "$(t verifying)"
       if command -v "$COMMAND_NAME" >/dev/null 2>&1 && "$COMMAND_NAME" --version; then echo "$(t success)"; else echo "$(t not_found)"; fi
