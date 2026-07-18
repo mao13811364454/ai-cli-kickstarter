@@ -1,5 +1,11 @@
 ﻿# AI CLI Kickstarter — Windows PowerShell
+# NOTE: kickstarter.sh mirrors this script; keep states and strings in sync.
 $ErrorActionPreference = "Stop"
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+    Write-Host "需要 PowerShell 5 或更新版本 / PowerShell 5 or newer is required."
+    Read-Host "Press Enter to exit" | Out-Null
+    exit 1
+}
 $Version = "0.1.0"
 $State = "LANGUAGE"
 $Language = ""
@@ -51,14 +57,20 @@ function Banner {
     Write-Host ""
 }
 
-function Probe-Google {
+function Test-GoogleReachability {
     try {
         $r = Invoke-WebRequest -Uri "https://www.google.com/generate_204" -Method Get -TimeoutSec 7 -MaximumRedirection 2 -UseBasicParsing
         if ($r.StatusCode -eq 204) { $script:GoogleStatus = "reachable" }
         else { $script:GoogleStatus = "unknown" }
     } catch {
-        $script:GoogleStatus = "unreachable"
+        # An HTTP response other than 204 means "unknown"; no response means "unreachable".
+        if ($_.Exception -is [System.Net.WebException] -and $_.Exception.Response) { $script:GoogleStatus = "unknown" }
+        else { $script:GoogleStatus = "unreachable" }
     }
+}
+
+function Test-Yes([string]$Answer) {
+    return ([string]::IsNullOrWhiteSpace($Answer) -or $Answer -match "^(y|yes|是)$")
 }
 
 function Select-Provider([string]$Choice) {
@@ -120,7 +132,7 @@ while ($true) {
             elseif ($c -eq "2") { $Language="en"; $State="PROBE" }
         }
         "PROBE" {
-            Banner; Write-Host (T "probing"); Probe-Google
+            Banner; Write-Host (T "probing"); Test-GoogleReachability
             Write-Host "`n$(T $GoogleStatus)"
             Write-Host (T "network_note")
             Start-Sleep -Seconds 1; $State="SELECT"
@@ -134,12 +146,11 @@ while ($true) {
             Write-Host "`n  [3] CodeBuddy CLI — $(T 'buddy')`n"
             $c = Read-Host (T "default")
             if ([string]::IsNullOrWhiteSpace($c)) { $c="1" }
-            if ($c -in @("1","2","3")) { Select-Provider $c; $State="PRECHECK" }
+            if ($c -match '^[123]$') { Select-Provider $c; $State="PRECHECK" }
         }
         "PRECHECK" {
             Banner; Write-Host (T "checking")
-            if ($PSVersionTable.PSVersion.Major -lt 5) { $LastError="PowerShell 5 or newer is required"; $State="ERROR" }
-            else { $State="CONFIRM" }
+            $State="CONFIRM"
         }
         "CONFIRM" {
             Banner
@@ -147,7 +158,7 @@ while ($true) {
             Write-Host "Google: $GoogleStatus"
             Write-Host "Source: $InstallUrl`n"
             $c=Read-Host (T "confirm")
-            if ([string]::IsNullOrWhiteSpace($c) -or $c -match "^(y|yes|是)$") { $State="INSTALL" } else { $State="DONE" }
+            if (Test-Yes $c) { $State="INSTALL" } else { $State="DONE" }
         }
         "INSTALL" {
             Banner; Write-Host (T "installing")
@@ -177,7 +188,7 @@ while ($true) {
         "HANDOFF" {
             Write-Host ""; Show-Handoff
             $c=Read-Host "`n$(T 'launch')"
-            if ([string]::IsNullOrWhiteSpace($c) -or $c -match "^(y|yes|是)$") {
+            if (Test-Yes $c) {
                 Update-SessionPath
                 try { & $CommandName } catch { Write-Host (T "not_found") }
             }
