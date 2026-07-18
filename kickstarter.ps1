@@ -81,7 +81,7 @@ function Select-Provider([string]$Choice) {
     }
 }
 
-function Update-SessionPath {
+function Sync-SessionPath {
     # Append, never replace: the installer runs via Invoke-Expression in this
     # process and may have extended $env:Path in-session rather than in the registry.
     $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
@@ -175,7 +175,7 @@ while ($true) {
             }
         }
         "VERIFY" {
-            Update-SessionPath; Write-Host "`n$(T 'verifying')"
+            Sync-SessionPath; Write-Host "`n$(T 'verifying')"
             try {
                 $cmd=Get-Command $CommandName -ErrorAction Stop
                 & $cmd.Source --version
@@ -189,7 +189,7 @@ while ($true) {
             Write-Host ""; Show-Handoff
             $c=Read-Host "`n$(T 'launch')"
             if (Test-Yes $c) {
-                Update-SessionPath
+                Sync-SessionPath
                 try { & $CommandName } catch { Write-Host (T "not_found") }
             }
             $State="DONE"
