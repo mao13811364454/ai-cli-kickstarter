@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Test stub for curl. Probe URLs report HTTP 204; installer downloads
+# succeed with a tiny marker script, or fail when CURL_STUB_MODE=fail.
+url=""
+for a in "$@"; do url="$a"; done
+case "$url" in
+  *generate_204*)
+    printf '204';;
+  *)
+    if [ "${CURL_STUB_MODE:-ok}" = "fail" ]; then exit 6; fi
+    printf 'echo installer-ran\n';;
+esac
