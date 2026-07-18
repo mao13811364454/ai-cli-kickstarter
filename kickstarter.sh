@@ -11,7 +11,7 @@ COMMAND_NAME=""
 INSTALL_URL=""
 LAST_ERROR=""
 
-clear_screen(){ command -v clear >/dev/null 2>&1 && clear || true; }
+clear_screen(){ if command -v clear >/dev/null 2>&1; then clear || true; fi; }
 
 is_yes(){ case "${1:-Y}" in y|Y|yes|YES|是) return 0;; *) return 1;; esac; }
 
