@@ -30,6 +30,8 @@ bash Start-Linux.sh
 
 双击 `Start-Windows.cmd`。它会启动 PowerShell 状态机。
 
+若出现「Windows 已保护你的电脑」（SmartScreen）提示，点击「更多信息」，再点击「仍要运行」。这是 Windows 对从网上下载的文件的常规提醒。
+
 ## 状态机
 
 `LANGUAGE → PROBE → SELECT → PRECHECK → CONFIRM → INSTALL → VERIFY → HANDOFF`
@@ -51,3 +53,16 @@ bash Start-Linux.sh
 - CodeBuddy CLI：官方 native installer（当前官方文档标注 Beta）
 
 安装器会在执行前显示下载地址。供应商可能更新安装方式，因此发布前应重新核对官方文档。
+
+信任模型：本工具会下载并执行上述三家官方域名提供的安装脚本，运行安装即表示信任这些来源。启动器不会自行校验脚本内容，但会在执行前显示下载地址并要求确认。
+
+## 开发
+
+- 运行测试：`bash tests/run-tests.sh`（使用本地 curl 桩，不访问网络）
+- Lint：`shellcheck kickstarter.sh Start-Linux.sh Start-macOS.command`
+- CI（GitHub Actions）在每次 push 时运行 shellcheck、PSScriptAnalyzer 与冒烟测试
+- `kickstarter.sh` 与 `kickstarter.ps1` 互为镜像，修改状态或文案时需要同步两个文件
+
+## 许可证
+
+MIT，见 [LICENSE](LICENSE)。
