@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
+# NOTE: kickstarter.ps1 mirrors this script; keep states and strings in sync.
 set -u
 
 VERSION="0.1.0"
 STATE="LANGUAGE"
 LANGUAGE=""
 GOOGLE_STATUS="unknown"
-PROVIDER=""
 PROVIDER_NAME=""
 COMMAND_NAME=""
 INSTALL_URL=""
 LAST_ERROR=""
 
 clear_screen(){ command -v clear >/dev/null 2>&1 && clear || true; }
+
+is_yes(){ case "${1:-Y}" in y|Y|yes|YES|是) return 0;; *) return 1;; esac; }
 
 t(){
   local k="$1"
@@ -83,9 +85,9 @@ probe_google(){
 
 select_provider(){
   case "$1" in
-    1) PROVIDER="qwen"; PROVIDER_NAME="Qwen Code"; COMMAND_NAME="qwen"; INSTALL_URL="https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh";;
-    2) PROVIDER="kimi"; PROVIDER_NAME="Kimi Code"; COMMAND_NAME="kimi"; INSTALL_URL="https://code.kimi.com/install.sh";;
-    3) PROVIDER="codebuddy"; PROVIDER_NAME="CodeBuddy CLI"; COMMAND_NAME="codebuddy"; INSTALL_URL="https://www.codebuddy.cn/cli/install.sh";;
+    1) PROVIDER_NAME="Qwen Code"; COMMAND_NAME="qwen"; INSTALL_URL="https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh";;
+    2) PROVIDER_NAME="Kimi Code"; COMMAND_NAME="kimi"; INSTALL_URL="https://code.kimi.com/install.sh";;
+    3) PROVIDER_NAME="CodeBuddy CLI"; COMMAND_NAME="codebuddy"; INSTALL_URL="https://www.codebuddy.cn/cli/install.sh";;
   esac
 }
 
@@ -129,30 +131,30 @@ EOF
 while true; do
   case "$STATE" in
     LANGUAGE)
-      banner; echo "$(t choose_language)"; echo; echo "  [1] 中文"; echo "  [2] English"; echo
+      banner; t choose_language; echo; echo "  [1] 中文"; echo "  [2] English"; echo
       read -r -p "> " c || exit 1
       case "$c" in 1) LANGUAGE="zh"; STATE="PROBE";; 2) LANGUAGE="en"; STATE="PROBE";; *) sleep 1;; esac;;
     PROBE)
-      banner; echo "$(t probing)"; probe_google; echo
-      echo "$(t "$GOOGLE_STATUS")"; echo "$(t network_note)"; sleep 1; STATE="SELECT";;
+      banner; t probing; probe_google; echo
+      t "$GOOGLE_STATUS"; t network_note; sleep 1; STATE="SELECT";;
     SELECT)
-      banner; echo "$(t "$GOOGLE_STATUS")"; echo; echo "$(t choose)"; echo
+      banner; t "$GOOGLE_STATUS"; echo; t choose; echo
       echo "  [1] Qwen Code — $(t qwen)"; echo
       echo "  [2] Kimi Code — $(t kimi)"; echo
       echo "  [3] CodeBuddy CLI — $(t buddy)"; echo
       read -r -p "$(t default) " c || exit 1
       case "${c:-1}" in 1|2|3) select_provider "${c:-1}"; STATE="PRECHECK";; *) sleep 1;; esac;;
     PRECHECK)
-      banner; echo "$(t checking)"
+      banner; t checking
       case "$(uname -s 2>/dev/null || true)" in Darwin|Linux) ;; *) LAST_ERROR="Unsupported OS"; STATE="ERROR"; continue;; esac
       command -v curl >/dev/null 2>&1 || { LAST_ERROR="curl is missing"; STATE="ERROR"; continue; }
       STATE="CONFIRM";;
     CONFIRM)
       banner; echo "$(t ready): $PROVIDER_NAME"; echo "Google: $GOOGLE_STATUS"; echo "Source: $INSTALL_URL"; echo
       read -r -p "$(t confirm) " c || exit 1
-      case "${c:-Y}" in y|Y|yes|YES|是) STATE="INSTALL";; *) STATE="DONE";; esac;;
+      if is_yes "$c"; then STATE="INSTALL"; else STATE="DONE"; fi;;
     INSTALL)
-      banner; echo "$(t installing)"; echo
+      banner; t installing; echo
       installer="$(curl -fsSL --connect-timeout 10 --max-time 60 "$INSTALL_URL")" || installer=""
       if [[ -z "$installer" ]]; then
         LAST_ERROR="download failed: $INSTALL_URL"; STATE="ERROR"
@@ -162,19 +164,19 @@ while true; do
         LAST_ERROR="$PROVIDER_NAME installer returned an error"; STATE="ERROR"
       fi;;
     VERIFY)
-      refresh_path; echo; echo "$(t verifying)"
-      if command -v "$COMMAND_NAME" >/dev/null 2>&1 && "$COMMAND_NAME" --version; then echo "$(t success)"; else echo "$(t not_found)"; fi
+      refresh_path; echo; t verifying
+      if command -v "$COMMAND_NAME" >/dev/null 2>&1 && "$COMMAND_NAME" --version; then t success; else t not_found; fi
       STATE="HANDOFF";;
     HANDOFF)
       echo; handoff; echo
       read -r -p "$(t launch) " c || exit 1
-      if [[ "${c:-Y}" =~ ^([yY]|yes|YES|是)$ ]]; then
+      if is_yes "$c"; then
         refresh_path
-        command -v "$COMMAND_NAME" >/dev/null 2>&1 && exec "$COMMAND_NAME"
+        if command -v "$COMMAND_NAME" >/dev/null 2>&1; then exec "$COMMAND_NAME"; else t not_found; fi
       fi
       STATE="DONE";;
     ERROR)
-      echo; echo "$(t failed) $LAST_ERROR"; echo "$(t retry)"; read -r -p "> " c || exit 1
+      echo; echo "$(t failed) $LAST_ERROR"; t retry; read -r -p "> " c || exit 1
       case "$c" in 1) STATE="PRECHECK";; 2) STATE="SELECT";; 3) STATE="DONE";; esac;;
     DONE)
       read -r -p "$(t exit)" _; exit 0;;
