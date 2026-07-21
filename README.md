@@ -2,11 +2,23 @@
 
 给完全不懂计算机的人安装第一个 AI CLI，然后由这个 AI 接管后续指导。
 
+## 项目来源
+
+本项目基于 [xiaolai/ai-cli-kickstarter](https://github.com/xiaolai/ai-cli-kickstarter) 修改。原项目由 xiaolai 创建并采用 MIT License 发布。
+
+本版本的改动范围：
+
+- 在 macOS 启动流程中增加 Codex CLI 选项和安装、验证逻辑；
+- 让从 Finder 启动的 macOS 脚本继承已启用的系统 HTTP(S) 代理。
+
+Linux 和 Windows 的工具选项保持原项目不变。
+
 ## 支持
 
 - Qwen Code
 - Kimi Code
 - CodeBuddy CLI
+- Codex CLI（仅 macOS）
 - macOS
 - Linux
 - Windows

@@ -2,7 +2,7 @@
 # NOTE: kickstarter.ps1 mirrors this script; keep states and strings in sync.
 set -u
 
-VERSION="0.1.0"
+VERSION="0.1.1-codex"
 STATE="LANGUAGE"
 LANGUAGE=""
 GOOGLE_STATUS="unknown"
@@ -27,11 +27,13 @@ t(){
       unknown) echo "无法可靠判断 Google 是否可访问。";;
       network_note) echo "该结果只代表当前 Terminal 对 Google 的连接，不判断地理位置。";;
       choose) echo "请选择一个 Kickstarter：";;
-      default) echo "直接按 Enter 选择 Qwen Code，或输入 1–3：";;
+      default) echo "直接按 Enter 选择 Qwen Code，或输入 1–${PROVIDER_MAX:-3}：";;
       qwen) echo "中国大陆友好；官方独立安装器";;
       kimi) echo "中国大陆友好；首次启动后输入 /login";;
       buddy) echo "腾讯生态；官方原生安装器目前为 Beta";;
+      codex) echo "OpenAI；安装后使用 ChatGPT 登录";;
       checking) echo "正在执行安装前检查……";;
+      npm_missing) echo "未找到 npm。请先安装 Node.js（LTS），然后重试。";;
       ready) echo "即将安装";;
       confirm) echo "继续？[Y/n]：";;
       installing) echo "正在运行官方安装器……";;
@@ -53,11 +55,13 @@ t(){
       unknown) echo "Google reachability could not be determined reliably.";;
       network_note) echo "This only tests the current terminal's access to Google; it does not infer location.";;
       choose) echo "Choose a kickstarter:";;
-      default) echo "Press Enter for Qwen Code, or enter 1–3:";;
+      default) echo "Press Enter for Qwen Code, or enter 1–${PROVIDER_MAX:-3}:";;
       qwen) echo "Mainland-China friendly; official standalone installer";;
       kimi) echo "Mainland-China friendly; enter /login after first launch";;
       buddy) echo "Tencent ecosystem; official native installer is currently Beta";;
+      codex) echo "OpenAI; sign in with ChatGPT after installation";;
       checking) echo "Running pre-installation checks...";;
+      npm_missing) echo "npm was not found. Install Node.js (LTS), then retry.";;
       ready) echo "Ready to install";;
       confirm) echo "Continue? [Y/n]: ";;
       installing) echo "Running the official installer...";;
@@ -88,6 +92,7 @@ select_provider(){
     1) PROVIDER_NAME="Qwen Code"; COMMAND_NAME="qwen"; INSTALL_URL="https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh";;
     2) PROVIDER_NAME="Kimi Code"; COMMAND_NAME="kimi"; INSTALL_URL="https://code.kimi.com/install.sh";;
     3) PROVIDER_NAME="CodeBuddy CLI"; COMMAND_NAME="codebuddy"; INSTALL_URL="https://www.codebuddy.cn/cli/install.sh";;
+    4) PROVIDER_NAME="Codex CLI"; COMMAND_NAME="codex"; INSTALL_URL="https://www.npmjs.com/package/@openai/codex";;
   esac
 }
 
@@ -142,12 +147,23 @@ while true; do
       echo "  [1] Qwen Code — $(t qwen)"; echo
       echo "  [2] Kimi Code — $(t kimi)"; echo
       echo "  [3] CodeBuddy CLI — $(t buddy)"; echo
+      if [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]]; then
+        PROVIDER_MAX=4
+        echo "  [4] Codex CLI — $(t codex)"; echo
+      else
+        PROVIDER_MAX=3
+      fi
       read -r -p "$(t default) " c || exit 1
-      case "${c:-1}" in 1|2|3) select_provider "${c:-1}"; STATE="PRECHECK";; *) sleep 1;; esac;;
+      case "${c:-1}" in
+        1|2|3) select_provider "${c:-1}"; STATE="PRECHECK";;
+        4) if [[ "$PROVIDER_MAX" == "4" ]]; then select_provider 4; STATE="PRECHECK"; else sleep 1; fi;;
+        *) sleep 1;;
+      esac;;
     PRECHECK)
       banner; t checking
       case "$(uname -s 2>/dev/null || true)" in Darwin|Linux) ;; *) LAST_ERROR="Unsupported OS"; STATE="ERROR"; continue;; esac
       command -v curl >/dev/null 2>&1 || { LAST_ERROR="curl is missing"; STATE="ERROR"; continue; }
+      if [[ "$COMMAND_NAME" == "codex" ]] && ! command -v npm >/dev/null 2>&1; then LAST_ERROR="$(t npm_missing)"; STATE="ERROR"; continue; fi
       STATE="CONFIRM";;
     CONFIRM)
       banner; echo "$(t ready): $PROVIDER_NAME"; echo "Google: $GOOGLE_STATUS"; echo "Source: $INSTALL_URL"; echo
@@ -155,13 +171,21 @@ while true; do
       if is_yes "$c"; then STATE="INSTALL"; else STATE="DONE"; fi;;
     INSTALL)
       banner; t installing; echo
-      installer="$(curl -fsSL --connect-timeout 10 --max-time 60 "$INSTALL_URL")" || installer=""
-      if [[ -z "$installer" ]]; then
-        LAST_ERROR="download failed: $INSTALL_URL"; STATE="ERROR"
-      elif bash -c "$installer"; then
-        STATE="VERIFY"
+      if [[ "$COMMAND_NAME" == "codex" ]]; then
+        if npm install -g @openai/codex; then
+          STATE="VERIFY"
+        else
+          LAST_ERROR="Codex CLI installer returned an error"; STATE="ERROR"
+        fi
       else
-        LAST_ERROR="$PROVIDER_NAME installer returned an error"; STATE="ERROR"
+        installer="$(curl -fsSL --connect-timeout 10 --max-time 60 "$INSTALL_URL")" || installer=""
+        if [[ -z "$installer" ]]; then
+          LAST_ERROR="download failed: $INSTALL_URL"; STATE="ERROR"
+        elif bash -c "$installer"; then
+          STATE="VERIFY"
+        else
+          LAST_ERROR="$PROVIDER_NAME installer returned an error"; STATE="ERROR"
+        fi
       fi;;
     VERIFY)
       refresh_path; echo; t verifying
